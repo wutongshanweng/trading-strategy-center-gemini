@@ -1,88 +1,32 @@
-import express, { Request, Response, NextFunction } from 'express';
-import { dataRouter } from '../src/api/routes/data.js';
-import { apiRouter } from '../src/api/index.js';
-import { ensureAllTables } from '../src/db/initSchema.js';
+import { Router } from 'express';
+import { healthRouter } from './routes/health.js';
+import { authRouter } from './routes/auth.js';
+import { intelligenceRouter } from './routes/intelligence.js';
+import { dataRouter } from './routes/data.js';
+import { backtestRouter } from './routes/backtest.js';
+import { modulesRouter } from './routes/modules.js';
+import { strategiesRouter } from './routes/strategies.js';
+import { factorsRouter } from './routes/factors.js';
+import { warehouseRouter } from './routes/warehouse.js';
+import { newsRouter } from './routes/news.js';
+import { llmRouter } from './routes/llm.js';
 
-const app = express();
+export const apiRouter = Router();
 
-// Simple zero-dependency CORS middleware for serverless
-app.use((req: Request, res: Response, next: NextFunction) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  next();
-});
+apiRouter.use('/', healthRouter); // Mounts /health, /system/time etc.
+apiRouter.use('/auth', authRouter); // Mounts /auth/me
+apiRouter.use('/intelligence', intelligenceRouter); // Mounts /intelligence/briefing
+apiRouter.use('/data', dataRouter); // Mounts /data/*
+apiRouter.use('/backtest', backtestRouter); // Mounts /backtest/*
+apiRouter.use('/modules', modulesRouter); // Mounts /modules/* (industry, factors, positions)
+apiRouter.use('/strategies', strategiesRouter); // Mounts /strategies/*
+apiRouter.use('/factor', factorsRouter); // Mounts /factor/*
+apiRouter.use('/factors', factorsRouter); // Mounts /factors/* (alias)
+apiRouter.use('/warehouse', warehouseRouter); // Mounts /warehouse/* (symbols, inventory)
+apiRouter.use('/data/warehouse', warehouseRouter); // Alias
+apiRouter.use('/macro-news', newsRouter); // Mounts /macro-news/* (dashboard, news)
+apiRouter.use('/briefing', newsRouter); // Mounts /briefing/*
+apiRouter.use('/news', newsRouter); // Mounts /news/*
+apiRouter.use('/llm', llmRouter); // Mounts /llm/* (providers, use-cases, tasks)
 
-// Auto ensure all DB tables exist asynchronously without blocking request pipeline
-let schemaInitialized = false;
-app.use((req: Request, res: Response, next: NextFunction) => {
-  if (!schemaInitialized) {
-    schemaInitialized = true;
-    ensureAllTables().catch((e) => {
-      console.warn('[DB] Auto schema init background note:', e.message);
-    });
-  }
-  next();
-});
-
-app.use(express.json({ limit: '10mb' }));
-
-// Mount routers to support both full (/api/v1, /api) and stripped (/v1, /) paths on Vercel Serverless
-app.use('/api/v1', apiRouter);
-app.use('/v1', apiRouter);
-app.use('/api', apiRouter);
-app.use('/', (req: Request, res: Response, next: NextFunction) => {
-  // If request begins with /api/v1 or /v1 or subpaths, dispatch to apiRouter
-  if (req.url.startsWith('/data') || req.url.startsWith('/intelligence') || req.url.startsWith('/backtest') || req.url.startsWith('/modules') || req.url.startsWith('/auth')) {
-    return apiRouter(req, res, next);
-  }
-  return apiRouter(req, res, next);
-});
-
-app.get('/api/health', async (req: Request, res: Response) => {
-  let dbStatus = 'unconfigured';
-  let dbError = null;
-  const hasDbUrl = Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.NEON_DATABASE_URL);
-
-  if (hasDbUrl) {
-    try {
-      const { pool, getDbDiagnostic } = await import('../src/db/index.js');
-      const start = Date.now();
-      const result = await pool.query('SELECT 1 as connected');
-      const latencyMs = Date.now() - start;
-      const diag = getDbDiagnostic ? getDbDiagnostic() : null;
-      dbStatus = result.rows?.[0]?.connected === 1 
-        ? `connected (${latencyMs}ms, engine: ${diag?.activeEngine || 'active'})` 
-        : 'unexpected_response';
-    } catch (e: any) {
-      dbStatus = 'connection_failed';
-      dbError = e.message;
-    }
-  }
-
-  res.json({
-    status: dbError ? 'warning' : 'ok',
-    mode: 'vercel_serverless',
-    database: {
-      has_database_url: hasDbUrl,
-      status: dbStatus,
-      error: dbError
-    },
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Global fallback JSON error handler to prevent Vercel HTML 500 error pages
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  console.error('[Vercel Serverless Error Handler]:', err);
-  res.status(500).json({
-    status: 'error',
-    error: err?.message || 'Server Internal Error',
-    type: err?.name || 'Error'
-  });
-});
-
-export default app;
+export default apiRouter;

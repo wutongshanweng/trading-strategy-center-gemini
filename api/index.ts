@@ -1,8 +1,8 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { dataRouter } from '../src/api/routes/data.js';
-import { apiRouter } from '../src/api/index.js';
+import apiRouter, { apiRouter as routerInstance } from '../src/api/index.js';
 import { ensureAllTables } from '../src/db/initSchema.js';
 
+const activeRouter = apiRouter || routerInstance;
 const app = express();
 
 // Simple zero-dependency CORS middleware for serverless
@@ -21,8 +21,8 @@ let schemaInitialized = false;
 app.use((req: Request, res: Response, next: NextFunction) => {
   if (!schemaInitialized) {
     schemaInitialized = true;
-    ensureAllTables().catch((e) => {
-      console.warn('[DB] Auto schema init background note:', e.message);
+    ensureAllTables().catch((e: any) => {
+      console.warn('[DB] Auto schema init background note:', e?.message || e);
     });
   }
   next();
@@ -31,29 +31,32 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use(express.json({ limit: '10mb' }));
 
 // Mount routers to support both full (/api/v1, /api) and stripped (/v1, /) paths on Vercel Serverless
-app.use('/api/v1', apiRouter);
-app.use('/v1', apiRouter);
-app.use('/api', apiRouter);
+app.use('/api/v1', activeRouter);
+app.use('/v1', activeRouter);
+app.use('/api', activeRouter);
 app.use('/', (req: Request, res: Response, next: NextFunction) => {
   // If request begins with /api/v1 or /v1 or subpaths, dispatch to apiRouter
   if (req.url.startsWith('/data') || req.url.startsWith('/intelligence') || req.url.startsWith('/backtest') || req.url.startsWith('/modules') || req.url.startsWith('/auth')) {
-    return apiRouter(req, res, next);
+    return activeRouter(req, res, next);
   }
-  return apiRouter(req, res, next);
+  return activeRouter(req, res, next);
 });
 
 app.get('/api/health', async (req: Request, res: Response) => {
   let dbStatus = 'unconfigured';
   let dbError = null;
-  const hasDbUrl = Boolean(process.env.DATABASE_URL);
+  const hasDbUrl = Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.NEON_DATABASE_URL);
 
   if (hasDbUrl) {
     try {
-      const { pool } = await import('../src/db/index.js');
+      const { pool, getDbDiagnostic } = await import('../src/db/index.js');
       const start = Date.now();
       const result = await pool.query('SELECT 1 as connected');
       const latencyMs = Date.now() - start;
-      dbStatus = result.rows?.[0]?.connected === 1 ? `connected (${latencyMs}ms)` : 'unexpected_response';
+      const diag = getDbDiagnostic ? getDbDiagnostic() : null;
+      dbStatus = result.rows?.[0]?.connected === 1 
+        ? `connected (${latencyMs}ms, engine: ${diag?.activeEngine || 'active'})` 
+        : 'unexpected_response';
     } catch (e: any) {
       dbStatus = 'connection_failed';
       dbError = e.message;
