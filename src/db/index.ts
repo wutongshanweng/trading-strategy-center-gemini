@@ -18,18 +18,24 @@ declare global {
 }
 
 // 1. Initialize persistent embedded PostgreSQL via PGlite with auto-recovery
-const dataDir = path.resolve(process.cwd(), 'data', 'pglite');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT);
+const dataDir = isServerless ? path.resolve('/tmp', 'pglite') : path.resolve(process.cwd(), 'data', 'pglite');
+
+try {
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+} catch (fsErr: any) {
+  console.warn('[DB] Notice on creating dataDir:', fsErr.message);
 }
 
 // Remove stale postmaster.pid if present from previous ungraceful termination
 const pidPath = path.join(dataDir, 'postmaster.pid');
-if (fs.existsSync(pidPath)) {
-  try {
+try {
+  if (fs.existsSync(pidPath)) {
     fs.unlinkSync(pidPath);
-  } catch {}
-}
+  }
+} catch {}
 
 let activePglite: PGlite;
 let pgliteReadyResolve!: () => void;
@@ -200,10 +206,31 @@ export function getDbDiagnostic(): DbDiagnosticInfo {
 const pgliteAdapter = createPglitePoolAdapter();
 const pgliteDbInstance = drizzlePglite(pglite, { schema });
 
-const useExternalPg = process.env.USE_EXTERNAL_PG !== 'false' && Boolean(process.env.DATABASE_URL);
+function getCleanDatabaseUrl(): string | null {
+  let raw = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.NEON_DATABASE_URL || '';
+  if (!raw || typeof raw !== 'string') return null;
 
-if (useExternalPg && process.env.DATABASE_URL) {
-  const connectionString = process.env.DATABASE_URL;
+  raw = raw.trim();
+  // Strip common copy-paste artifacts like "Neon:DATABASE_URL," or "DATABASE_URL=" or wrapping quotes
+  raw = raw.replace(/^(Neon:\s*)?DATABASE_URL\s*[,=:\s]\s*/i, '');
+  raw = raw.replace(/^["']|["']$/g, '').trim();
+
+  if (!raw.startsWith('postgres://') && !raw.startsWith('postgresql://')) {
+    return null;
+  }
+
+  // Remove channel_binding=require as standard node-postgres driver does not support SCRAM channel binding option cleanly in query params
+  raw = raw.replace(/[?&]channel_binding=[^&]+/g, (match) => match.startsWith('?') ? '?' : '');
+  raw = raw.replace(/\?&/g, '?').replace(/[?&]$/g, '');
+
+  return raw;
+}
+
+const cleanedDbUrl = getCleanDatabaseUrl();
+const useExternalPg = process.env.USE_EXTERNAL_PG !== 'false' && Boolean(cleanedDbUrl);
+
+if (useExternalPg && cleanedDbUrl) {
+  const connectionString = cleanedDbUrl;
   const isSsl = connectionString.includes('sslmode=require') || 
                 connectionString.includes('neon.tech') || 
                 connectionString.includes('supabase');
@@ -211,9 +238,9 @@ if (useExternalPg && process.env.DATABASE_URL) {
   const externalPool = new Pool({
     connectionString,
     ssl: isSsl ? { rejectUnauthorized: false } : false,
-    max: 10,
-    connectionTimeoutMillis: 7000,
-    idleTimeoutMillis: 30000,
+    max: isServerless ? 5 : 10,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: isServerless ? 10000 : 30000,
   });
 
   externalPool.on('error', (err) => {
