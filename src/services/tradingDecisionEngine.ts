@@ -43,9 +43,14 @@ export class TradingDecisionEngine {
   /**
    * Generate quantitative trading decision from OHLCV bars
    */
-  public static analyze(symbol: string, period: string, bars: KlineBar[]): TradingDecisionResult {
+  /**
+   * Generate quantitative trading decision from OHLCV bars
+   * @param options.scoreThreshold 可选的品种校准分阈值（默认 35），用于按品种波动率调整建仓门槛
+   */
+  public static analyze(symbol: string, period: string, bars: KlineBar[], options?: { scoreThreshold?: number }): TradingDecisionResult {
     const spec = getContractSpec(symbol);
     const sorted = [...bars].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const scoreThreshold = options?.scoreThreshold ?? 35;
 
     if (sorted.length < 5) {
       const dummyPrice = spec.basePrice;
@@ -123,7 +128,7 @@ export class TradingDecisionEngine {
     const reasons: string[] = [];
     const riskWarnings: string[] = [];
 
-    if (totalScore >= 35) {
+    if (totalScore >= scoreThreshold) {
       decision = 'BUY';
       decisionLabel = '建议顺势建多 (BUY)';
       confidence = Math.min(95, Math.round(55 + totalScore * 0.4));
@@ -133,7 +138,7 @@ export class TradingDecisionEngine {
       if (volumeRatio > 1.2) {
         reasons.push(`放量突破，近期成交量为均量的 ${(volumeRatio * 100).toFixed(0)}%`);
       }
-    } else if (totalScore <= -35) {
+    } else if (totalScore <= -scoreThreshold) {
       decision = 'SELL';
       decisionLabel = '建议逢高沽空 (SELL)';
       confidence = Math.min(95, Math.round(55 + Math.abs(totalScore) * 0.4));

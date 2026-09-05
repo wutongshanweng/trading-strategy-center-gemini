@@ -17,13 +17,13 @@ export interface SignalItem {
   symbol: string;
   name: string;
   assetType: 'futures' | 'stock' | 'option';
-  direction: 'BUY' | 'SELL';
+  direction: 'BUY' | 'SELL' | 'HOLD';
   confidence: number;
   starRating: number;
   freshness: string;
   timestamp?: number;
   status: 'active' | 'triggered' | 'expired';
-  quality: 'high' | 'medium';
+  quality: 'high' | 'medium' | 'low';
   tradingPlan: {
     entry: number;
     stopLoss: number;
@@ -32,8 +32,8 @@ export interface SignalItem {
     positionPct: number;
   };
   tripleScreen: {
-    d1Trend: 'BULLISH' | 'BEARISH' | 'RANGE';
-    h1Signal: 'BUY' | 'SELL';
+    d1Trend: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    h1Signal: 'BUY' | 'SELL' | 'NEUTRAL';
     m30Confirm: boolean;
     chanPattern?: string;
   };
@@ -468,7 +468,7 @@ export function TradingSignals({ onSelectSymbol, onNavigateToDecision }: Trading
       const steps = resJson?.data?.steps || [
         `🤖 [1/4] 启动全维智能体推理引擎 [${selectedLlmModel}]，加载【${activeSignal.name}】所属板块宏观因子与产业基本面...`,
         `📈 [2/4] 检索匹配宏观指标完成：${activeSignal.resonance.macro.news[0] || '宏观指标景气度平稳'}。`,
-        `🧬 [3/4] 加载 483 维异构量化因子：${activeSignal.resonance.factors.highlights.slice(0, 2).join('；')}。`,
+        `🧬 [3/4] 加载实时因子归因与技术事实：${activeSignal.resonance.factors.highlights.slice(0, 2).join('；')}。`,
         `📐 [4/4] 提取多周期K线图谱：缠论形态确立【${activeSignal.tripleScreen.chanPattern}】，D1大周期处于【${activeSignal.tripleScreen.d1Trend}】状态。`,
         `📊 [完成] [${selectedLlmModel}] 对宏观、新闻、量化因子、缠论技术面执行多因子交叉评分，完成共振可信度测算...`
       ];
@@ -759,7 +759,7 @@ export function TradingSignals({ onSelectSymbol, onNavigateToDecision }: Trading
                   </span>
                 </h1>
                 <p className="text-xs text-indigo-200/80 mt-1">
-                  融合 <strong className="text-white">90+ 策略算法模型</strong>、<strong className="text-white">483 维异构因子</strong> 与 <strong className="text-white">多周期K线真实动态推演</strong> 输出的高置信度实战交易信号。
+                  融合 <strong className="text-white">实时多周期K线推演</strong>、<strong className="text-white">决策引擎与ML归因</strong> 与 <strong className="text-white">三重滤网共振</strong> 输出的动态交易信号。
                 </p>
               </div>
             </div>
@@ -1003,7 +1003,9 @@ export function TradingSignals({ onSelectSymbol, onNavigateToDecision }: Trading
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-black tracking-widest ${
                           sig.direction === 'BUY' 
                             ? 'bg-emerald-500 text-slate-950 shadow-xs' 
-                            : 'bg-rose-500 text-white shadow-xs'
+                            : sig.direction === 'SELL'
+                              ? 'bg-rose-500 text-white shadow-xs'
+                              : 'bg-slate-600 text-white shadow-xs'
                         }`}>
                           {sig.direction}
                         </span>
@@ -1080,9 +1082,9 @@ export function TradingSignals({ onSelectSymbol, onNavigateToDecision }: Trading
                   <div>
                     <div className="flex items-center gap-3">
                       <span className={`px-3 py-1 rounded-lg text-xs font-black tracking-widest ${
-                        activeSignal.direction === 'BUY' ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'
+                        activeSignal.direction === 'BUY' ? 'bg-emerald-500 text-slate-950' : activeSignal.direction === 'SELL' ? 'bg-rose-500 text-white' : 'bg-slate-600 text-white'
                       }`}>
-                        {activeSignal.direction === 'BUY' ? '做多看涨 BUY' : '做空看跌 SELL'}
+                        {activeSignal.direction === 'BUY' ? '做多看涨 BUY' : activeSignal.direction === 'SELL' ? '做空看跌 SELL' : '观望等待 HOLD'}
                       </span>
                       <h2 className="text-xl font-bold text-white flex items-center gap-2">
                         {activeSignal.symbol} 
@@ -1388,12 +1390,12 @@ export function TradingSignals({ onSelectSymbol, onNavigateToDecision }: Trading
                   {/* 策略库共振 */}
                   <div className="space-y-3">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-indigo-400" /> 策略库模型共振 (90+ Models)
+                      <Layers className="w-4 h-4 text-indigo-400" /> 量化子信号共振 (实时投票)
                     </h3>
                     <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
                       <div className="flex items-center justify-between mb-2 text-xs text-slate-400 font-mono">
-                        <span>看多策略: <strong className="text-emerald-400">{activeSignal.resonance.strategy.bullish}</strong></span>
-                        <span>看空策略: <strong className="text-rose-400">{activeSignal.resonance.strategy.bearish}</strong></span>
+                        <span>看多子信号: <strong className="text-emerald-400">{activeSignal.resonance.strategy.bullish}</strong></span>
+                        <span>看空子信号: <strong className="text-rose-400">{activeSignal.resonance.strategy.bearish}</strong></span>
                       </div>
                       <div className="w-full h-2 rounded-full overflow-hidden flex bg-slate-800 mb-4">
                         <div style={{ width: `${(activeSignal.resonance.strategy.bullish / activeSignal.resonance.strategy.total) * 100}%` }} className="bg-emerald-500" />
@@ -1415,7 +1417,7 @@ export function TradingSignals({ onSelectSymbol, onNavigateToDecision }: Trading
                   {/* 异构因子共振 */}
                   <div className="space-y-3">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                      <Globe className="w-4 h-4 text-cyan-400" /> 异构因子共振 (483 Factors)
+                      <Globe className="w-4 h-4 text-cyan-400" /> 因子共振 (ML归因+技术事实)
                     </h3>
                     <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
                       <div className="flex items-center justify-between mb-4 text-xs">

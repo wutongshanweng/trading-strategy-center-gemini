@@ -389,7 +389,7 @@ class DataEngineService {
   /**
    * Query and dynamic resample K-lines across all supported timeframes
    */
-  public async getKlinesWithResampling(symbol: string, period: SupportedPeriod = '1d', limit: number = 50, endDate?: string): Promise<{
+  public async getKlinesWithResampling(symbol: string, period: SupportedPeriod = '1d', limit: number = 50, endDate?: string, decisionOptions?: { scoreThreshold?: number }): Promise<{
     symbol: string;
     contractInfo: ContractDetails;
     period: SupportedPeriod;
@@ -594,7 +594,7 @@ class DataEngineService {
     // -------------------------------------------------------------------
 
     // Compute trading decision & quantitative analysis
-    const decision = TradingDecisionEngine.analyze(upperSymbol, period, finalBars);
+    const decision = TradingDecisionEngine.analyze(upperSymbol, period, finalBars, decisionOptions);
 
     // Compute Machine Learning feature engineering & ensemble prediction
     const mlPrediction = MLEngine.predict(upperSymbol, period, finalBars);
