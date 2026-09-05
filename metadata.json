@@ -1,0 +1,6 @@
+{
+  "name": "数往知来",
+  "description": "数往知来 - 中国期货多维聚合与AI决策系统",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
