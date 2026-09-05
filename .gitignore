@@ -1,0 +1,57 @@
+__pycache__/
+*.pyc
+.env
+.venv
+venv/
+logs/
+/data/
+!core/data/
+!core/data/**
+*.db
+celerybeat-schedule.*
+*.log
+.vscode/
+.idea/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+
+# DuckDB 运行时文件
+*.db.wal
+*.db.tmp/
+# 下载进度 (运行时状态)
+data_center/download_checkpoint.json
+# TS 构建缓存
+*.tsbuildinfo
+# OpenWolf 运行时日志 (非追踪)
+.wolf/*.log
+# 本地启动日志 (后端/前端运行时生成)
+*.run.log
+api.log
+frontend-dev.log
+# 参数优化版本存储 (运行时生成)
+parameter_store/
+
+# 运行时备份文件
+*.bak
+# Frontend dependencies
+node_modules/
+
+# Local/runtime artifacts
+*.pid
+news_page.png
+screenshot-*.png
+products.json
+temp_download/
+.codex/
+.omo/
+.wolf/designqc-captures/
+
+# Frozen legacy loop runtime state; contracts/readmes remain tracked.
+loops/**/LOGS.md
+loops/**/STATE.md
+loops/**/*state.json
+loops/graph_state.json
+trading_journal/

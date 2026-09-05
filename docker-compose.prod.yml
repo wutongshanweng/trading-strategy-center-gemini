@@ -1,0 +1,123 @@
+services:
+  app:
+    image: trading-strategy-center:prod
+    build:
+      context: .
+      args:
+        INSTALL_EXTRAS: ""
+    ports: ["8000:8000"]
+    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_started } }
+    env_file: .env
+    environment:
+      TZ: Asia/Shanghai
+      ENV: production
+      DEBUG: "false"
+      TSC_ADMIN_PASSWORD: ${TSC_ADMIN_PASSWORD:?TSC_ADMIN_PASSWORD is required}
+      TSC_AUTH_SECRET: ${TSC_AUTH_SECRET:?TSC_AUTH_SECRET is required}
+      AGENT_JWT_SECRET: ${AGENT_JWT_SECRET:?AGENT_JWT_SECRET is required}
+      AGENT_API_KEY_PEPPER: ${AGENT_API_KEY_PEPPER:?AGENT_API_KEY_PEPPER is required}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    volumes: [./logs:/app/logs]
+    restart: unless-stopped
+    networks: [trading-net]
+    deploy:
+      resources:
+        limits: { cpus: "2", memory: "4G" }
+        reservations: { cpus: "1", memory: "2G" }
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${DB_USER:-trading}
+      POSTGRES_PASSWORD: ${DB_PASS:-trading_pass}
+      POSTGRES_DB: ${DB_NAME:-trading_strategy_center}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-trading}"], interval: 10s, timeout: 5s, retries: 5 }
+    restart: unless-stopped
+    networks: [trading-net]
+    deploy:
+      resources:
+        limits: { cpus: "2", memory: "2G" }
+
+  redis:
+    image: redis:7-alpine
+    volumes: [redis_data:/data]
+    command: redis-server --appendonly yes --save 900 1 --save 300 10 --save 60 10000
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 10s, timeout: 3s, retries: 5 }
+    restart: unless-stopped
+    networks: [trading-net]
+
+  celery_worker:
+    image: trading-strategy-center:prod
+    build:
+      context: .
+      args:
+        # Keep production worker slim by default. Set to "signal" or "ml,signal"
+        # only when this host really runs optional model/signal workloads.
+        INSTALL_EXTRAS: ""
+    command: celery -A tasks.celery_app worker -Q celery,backtest,training --loglevel=info --concurrency=2 --max-tasks-per-child=100
+    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_started } }
+    env_file: .env
+    environment:
+      TZ: Asia/Shanghai
+      ENV: production
+      DEBUG: "false"
+      AGENT_JWT_SECRET: ${AGENT_JWT_SECRET:?AGENT_JWT_SECRET is required}
+      AGENT_API_KEY_PEPPER: ${AGENT_API_KEY_PEPPER:?AGENT_API_KEY_PEPPER is required}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    volumes: [./logs:/app/logs]
+    restart: unless-stopped
+    networks: [trading-net]
+    deploy:
+      resources:
+        limits: { cpus: "2", memory: "4G" }
+
+  celery_beat:
+    image: trading-strategy-center:prod
+    build:
+      context: .
+      args:
+        INSTALL_EXTRAS: ""
+    command: celery -A tasks.celery_app beat --loglevel=info
+    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_started } }
+    env_file: .env
+    environment:
+      TZ: Asia/Shanghai
+      ENV: production
+      DEBUG: "false"
+      AGENT_JWT_SECRET: ${AGENT_JWT_SECRET:?AGENT_JWT_SECRET is required}
+      AGENT_API_KEY_PEPPER: ${AGENT_API_KEY_PEPPER:?AGENT_API_KEY_PEPPER is required}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    volumes: [./logs:/app/logs]
+    restart: unless-stopped
+    networks: [trading-net]
+
+
+  nginx:
+    image: nginx:alpine
+    ports: ["80:80"]
+    volumes: [./nginx.conf:/etc/nginx/nginx.conf:ro]
+    depends_on: [app]
+    restart: unless-stopped
+    networks: [trading-net]
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: "256M" }
+
+volumes: { postgres_data: {}, redis_data: {} }
+networks: { trading-net: { driver: bridge } }

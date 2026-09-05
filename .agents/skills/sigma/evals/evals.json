@@ -1,0 +1,78 @@
+{
+  "skill_name": "sigma",
+  "description": "Bloom's 2-Sigma mastery tutor with Socratic questioning, interleaving, and visual output",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Teach me Python decorators",
+      "expected_output": "Diagnose level first, then build roadmap, then tutor loop. Should never give direct answer — only ask questions.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Diagnoses level before teaching",
+          "description": "Must ask diagnostic questions or load existing profile before building roadmap"
+        },
+        {
+          "text": "Has roadmap output",
+          "description": "Must generate session.md with concept map and roadmap.html"
+        },
+        {
+          "text": "Never gives direct answers",
+          "description": "All responses should be questions, hints, or requests for explanation — never 'Here is what a decorator is...'"
+        },
+        {
+          "text": "Tracks misconceptions",
+          "description": "Wrong answers should be diagnosed as misconceptions and logged in session.md"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I want to learn about neural networks — I'm a beginner",
+      "expected_output": "Start from foundational concepts (what is a neuron, perceptron) and build up. Use AskUserQuestion for structured diagnostic.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Respects --level beginner",
+          "description": "Must not assume prior knowledge of linear algebra or calculus"
+        },
+        {
+          "text": "Builds prerequisite roadmap",
+          "description": "Must decompose neural networks into at least 4-5 atomic concepts ordered by dependency"
+        },
+        {
+          "text": "Uses interleaving after 3-4 questions",
+          "description": "Every 3-4 questions, inserts a question mixing previous concept with current one"
+        },
+        {
+          "text": "Has mastery gate",
+          "description": "Must not mark a concept mastered until rubric >= 80% AND practice phase passed"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/sigma linear algebra --resume",
+      "expected_output": "Load existing session state from sigma/linear-algebra/session.md, run spaced repetition review on due concepts first, then continue",
+      "files": ["sigma/linear-algebra/session.md"],
+      "assertions": [
+        {
+          "text": "Restores session state",
+          "description": "Must read session.md and restore concept map, misconceptions, and review intervals"
+        },
+        {
+          "text": "Checks spaced repetition first",
+          "description": "Must check Last Reviewed + Review Interval before advancing to new content"
+        },
+        {
+          "text": "Updates roadmap.html every round",
+          "description": "Must regenerate roadmap.html after every question round with updated scores"
+        },
+        {
+          "text": "Does NOT open browser automatically",
+          "description": "roadmap.html is saved silently — browser opened only on first generation or user request"
+        }
+      ]
+    }
+  ]
+}

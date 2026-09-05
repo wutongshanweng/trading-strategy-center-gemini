@@ -1,0 +1,55 @@
+# Secrets / VCS
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.gitattributes
+
+# Python caches / local tooling
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Node / frontend build artifacts; production backend image does not need them
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.turbo/
+frontend/coverage/
+frontend/*.log
+
+# Runtime data generated outside the image
+logs/
+*.log
+data/history/
+data/market_data.duckdb
+data/**/*.duckdb
+temp_download/
+
+# Agent/local workspace metadata
+.wolf/
+.agents/
+.vscode/
+.idea/
+
+# Tests and docs are not needed in runtime images
+tests/
+docs/
+*.md
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
